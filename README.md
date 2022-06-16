@@ -1,2 +1,2 @@
-# OpenStreetMap-Attributes
+# OpenMapLayers
 Map attributes derived from OSM tags

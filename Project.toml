@@ -1,0 +1,7 @@
+name = "OpenMapLayers"
+uuid = "ce3a4827-d3a7-4bd7-9fb1-26361d1a3cdb"
+authors = ["Jonas Klasen <jrklasen@pm.me>"]
+version = "0.1.0"
+
+[deps]
+OpenStreetMapIO = "005c2571-dbef-4654-b731-b11a1a12058a"
