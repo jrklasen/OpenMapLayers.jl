@@ -54,7 +54,7 @@ function road_layers(map::OpenStreetMap)::RoadLayer
             roadlayer = nothing
         end
         if roadlayer !== nothing
-            roads.nodes[k] = RoadNode(v.latlon,roadlayer)
+            roads.nodes[k] = RoadNode(v.latlon, roadlayer)
         end
     end
     return roads

@@ -1,12 +1,12 @@
 struct RoadNodeAttribute
-    access::Bool
+    access::Union{Bool,Nothing}
+    foot::Union{Bool,Nothing}
+    wheelchair::Union{Bool,Nothing}
+    bicycle::Union{Bool,Nothing}
+    car::Union{Bool,Nothing}
+    privat::Bool
     barring::Bool
     crossing::Bool
-    foot::Bool
-    wheelchair::Bool
-    bicycle::Bool
-    car::Bool
-    privat::Bool
 end
 
 function road_node_attributes(tags)
@@ -17,8 +17,8 @@ function road_node_attributes(tags)
     access = node_access(tags)
     # barring, like gate and bollard
     barring = node_barring(tags)
-    # check if the node a crossing?
-    if !barring[:gate] && !barring[:bollard] && !barring[:sump_buster] && access[:access]
+    # check if the node is a crossing?
+    if !barring[:gate] && !barring[:bollard] && !barring[:sump_buster] && access[:access] == true
         crossing = get(tags, "highway", "") == "crossing" || get(tags, "railway", "") == "crossing" ||
                    get(tags, "footway", "") == "crossing" || get(tags, "cycleway", "") == "crossing" ||
                    get(tags, "foot", "") == "crossing" || get(tags, "bicycle", "") == "crossing" ||
@@ -40,30 +40,35 @@ function road_node_attributes(tags)
         privat = false
     end
 
-    attr = RoadNodeAttribute(
-        access[:access],
-        barring[:gate],
-        crossing,
-        foot_access[:foot],
-        wheelchair_access[:wheelchair],
-        bicycle_access[:bicycle],
-        car_access[:car],
-        privat,
+    if access[:access] !== nothing || foot_access[:foot] !== nothing || wheelchair_access[:wheelchair] !== nothing ||
+        bicycle_access[:bicycle] !== nothing || car_access[:car] !== nothing || privat || barring[:gate] || crossing
+        attr = RoadNodeAttribute(
+            access[:access],
+            foot_access[:foot],
+            wheelchair_access[:wheelchair],
+            bicycle_access[:bicycle],
+            car_access[:car],
+            privat,
+            barring[:gate],
+            crossing,
         )
+    else
+        attr = nothing
+    end
 
     return attr
 end
 
-function node_access(tags)::Dict{Symbol,Bool}
+function node_access(tags)::Dict{Symbol,Union{Bool,Nothing}}
     raw_access = get(tags, "access", "")
     access_tag = haskey(ACCESS, raw_access)
-    access = get(ACCESS, raw_access, true)
+    access = get(ACCESS, raw_access, nothing)
     if get(tags, "impassable", "") == "yes" ||
        (get(tags, "access", "") == "private" &&
         (get(tags, "emergency", "") == "yes" || get(tags, "service", "") == "emergency_access"))
         access = false
     end
-    return Dict{Symbol,Bool}(:access => access, :access_tag => access_tag)
+    return Dict{Symbol,Union{Bool,Nothing}}(:access => access, :access_tag => access_tag)
 end
 
 function node_barring(tags)::Dict{Symbol,Bool}
@@ -90,22 +95,19 @@ end
 
 function node_foot(
     tags::Dict{String,String},
-    access::Dict{Symbol,Bool},
+    access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
     crossing::Bool
 )
     foot = get(FOOT_ACCESS, get(tags, "foot", ""), nothing)
     foot_tag = true
-    # if tag is missing, try to derive access info from additional information
+    # if tag is nothing, try to derive access info from additional information
     if foot === nothing
         foot_tag = false
-        if get(tags, "hov", "") == "designated" || !access[:access]
+        if get(tags, "hov", "") == "designated" || access[:access] == false
             foot = false
-        else
-            foot = true
         end
-        if !barring[:gate] && barring[:bollard] && !access[:access_tag]
-            foot = true
+        if !barring[:gate] && barring[:bollard] && access[:access] == false
         elseif !barring[:gate] && barring[:sump_buster]
             foot = true
         end
@@ -113,12 +115,12 @@ function node_foot(
             foot = true
         end
     end
-    return Dict{Symbol,Bool}(:foot => foot, :foot_tag => foot_tag)
+    return Dict{Symbol,Union{Bool,Nothing}}(:foot => foot, :foot_tag => foot_tag)
 end
 
 function node_wheelchair(
     tags::Dict{String,String},
-    access::Dict{Symbol,Bool},
+    access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
     crossing::Bool
 )
@@ -128,15 +130,13 @@ function node_wheelchair(
         wheelchair = true
     end
     wheelchair_tag = true
-    # if tag is missing, derive access from additional information
+    # if tag is nothing, derive access from additional information
     if wheelchair === nothing
         wheelchair_tag = false
-        if get(tags, "vehicle", "") == "no" || get(tags, "hov", "") == "designated" || !access[:access]
+        if get(tags, "vehicle", "") == "no" || get(tags, "hov", "") == "designated" || access[:access] == false
             wheelchair = false
-        else
-            wheelchair = true
         end
-        if !barring[:gate] && barring[:bollard] && !access[:access_tag]
+        if !barring[:gate] && barring[:bollard] && access[:access] == false
             wheelchair = true
         elseif !barring[:gate] && barring[:sump_buster]
             wheelchair = true
@@ -145,30 +145,28 @@ function node_wheelchair(
             wheelchair = true
         end
     end
-    return Dict{Symbol,Bool}(:wheelchair => wheelchair, :wheelchair_tag => wheelchair_tag)
+    return Dict{Symbol,Union{Bool,Nothing}}(:wheelchair => wheelchair, :wheelchair_tag => wheelchair_tag)
 end
 
 function node_bicycle(
     tags::Dict{String,String},
-    access::Dict{Symbol,Bool},
+    access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
     crossing::Bool
 )
-    bicycle = get(BICYCLE_ACCESS, get(tags, "bicycle", ""), missing)
+    bicycle = get(BICYCLE_ACCESS, get(tags, "bicycle", ""), nothing)
     # do not shut off bicycle access if there is a highway crossing.
-    if bicycle === missing && get(tags, "highway", "") == "crossing"
+    if bicycle === nothing && get(tags, "highway", "") == "crossing"
         bicycle = true
     end
     bicycle_tag = true
-    # if tag is missing, derive access from additional information
-    if bicycle === missing
+    # if tag is nothing, derive access from additional information
+    if bicycle === nothing
         bicycle_tag = false
-        if get(tags, "vehicle", "") == "no" || get(tags, "hov", "") == "designated" || !access[:access]
+        if get(tags, "vehicle", "") == "no" || get(tags, "hov", "") == "designated" || access[:access] == false
             bicycle = false
-        else
-            bicycle = true
         end
-        if !barring[:gate] && barring[:bollard] && !access[:access_tag]
+        if !barring[:gate] && barring[:bollard] && access[:access] == false
             bicycle = true
         elseif !barring[:gate] && barring[:sump_buster]
             bicycle = true
@@ -177,27 +175,25 @@ function node_bicycle(
             bicycle = true
         end
     end
-    return Dict{Symbol,Bool}(:bicycle => bicycle, :bicycle_tag => bicycle_tag)
+    return Dict{Symbol,Union{Bool,Nothing}}(:bicycle => bicycle, :bicycle_tag => bicycle_tag)
 end
 
 function node_car(
     tags::Dict{String,String},
-    access::Dict{Symbol,Bool},
+    access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
     crossing::Bool
 )
-    motor_vehicle = get(MOTOR_VEHICLE_ACCESS, get(tags, "motor_vehicle", ""), missing)
+    motor_vehicle = get(MOTOR_VEHICLE_ACCESS, get(tags, "motor_vehicle", ""), nothing)
     car = get(MOTOR_VEHICLE_ACCESS, get(tags, "motorcar", ""), motor_vehicle)
     car_tag = true
-    # if tag is missing, derive access from additional information
-    if car === missing
+    # if tag is nothing, derive access from additional information
+    if car === nothing
         car_tag = false
-        if get(tags, "vehicle", "") == "no" || get(tags, "hov", "") == "designated" || !access[:access]
+        if get(tags, "vehicle", "") == "no" || get(tags, "hov", "") == "designated" || access[:access] == false
             car = false
-        else
-            car = true
         end
-        if !barring[:gate] && barring[:bollard] && !access[:access_tag]
+        if !barring[:gate] && barring[:bollard] && access[:access] == false
             car = false
         elseif !barring[:gate] && barring[:sump_buster]
             car = false
@@ -206,5 +202,5 @@ function node_car(
             car = true
         end
     end
-    return Dict{Symbol,Bool}(:car => car, :car_tag => car_tag)
+    return Dict{Symbol,Union{Bool,Nothing}}(:car => car, :car_tag => car_tag)
 end
