@@ -1,12 +1,12 @@
 """
-Maxspeed tag as number
+Parse maxspeed tag as number
 """
-function parse_maxspeed(tag::Union{String,Nothing})::Union{Int,Missing}
+function parse_maxspeed(tag::Union{String,Nothing})::Union{Float64,Missing,Nothing}
     if tag === nothing
-        return missing
+        return nothing
     end
     if tag === "none"
-        return Inf
+        return Inf64
     end
     # turn commas into dots to handle European-style decimal separators
     tag = replace(tag, "," => ".")
@@ -14,31 +14,26 @@ function parse_maxspeed(tag::Union{String,Nothing})::Union{Int,Missing}
     if number !== nothing
         number = parse(Float64, number.match)
         unit = match(r"(km/h|kmh|kph|mph|knots)$", tag)
-        if unit === nothing
-            return Int(floor(number))
-        else
-            if unit.match === nothing
-                return Int(floor(number))
-            elseif unit.match in ["km/h", "kmh", "kph"]
-                return Int(floor(number))
-            elseif unit.match === "mph"
-                return Int(floor(number * 1.609))
-            elseif unit.match === "knots"
-                return Int(floor(number * 1.852))
-            end
+        if unit === nothing && unit.match === nothing
+            return round(number, digits=2)
+        elseif unit.match in ["km/h", "kmh", "kph"]
+            return round(number, digits=2)
+        elseif unit.match == "mph"
+            return round(number * 1.609, digits=2)
+        elseif unit.match == "knots"
+            return round(number * 1.852, digits=2)
         end
-    else
-        return missing
     end
+    return missing
 end
 
 
 """
-dimension
+Parsing height, width and length tags as a number
 """
-function parse_dimension(tag::Union{String,Nothing})::Union{Real,Missing}
+function parse_dimension(tag::Union{String,Nothing})::Union{Real,Missing,Nothing}
     if tag === nothing
-        return missing
+        return nothing
     end
     # turn commas into dots to handle European-style decimal separators
     tag = replace(tag, "," => ".")
@@ -46,33 +41,28 @@ function parse_dimension(tag::Union{String,Nothing})::Union{Real,Missing}
     if number !== nothing
         number = parse(Float64, number.match)
         unit = match(r"(m|meter|meters|cm|ft|feet|foot|in|inch|inches)$", tag)
-        if unit === nothing
+        if unit === nothing && unit.match === nothing
             return round(number, 2)
-        else
-            if unit.match === nothing
-                return round(number, 2)
-            elseif unit.match in ["m", "meter", "meters"]
-                return round(number, 2)
-            elseif unit.match === "cm"
-                return round(number * 0.01, 2)
-            elseif unit.match in ["ft", "feet", "foot"]
-                return round(number * 0.3048, 2)
-            elseif unit.match in ["in", "inch", "inches"]
-                return round(number * 0.0254, 2)
-            end
+        elseif unit.match in ["m", "meter", "meters"]
+            return round(number, 2)
+        elseif unit.match == "cm"
+            return round(number * 0.01, 2)
+        elseif unit.match in ["ft", "feet", "foot"]
+            return round(number * 0.3048, 2)
+        elseif unit.match in ["in", "inch", "inches"]
+            return round(number * 0.0254, 2)
         end
-    else
-        return missing
     end
+    return missing
 end
 
 
 """
-weight
+Parsing weight tags as a number
 """
-function parse_weight(tag::Union{String,Nothing})::Union{Real,Missing}
+function parse_weight(tag::Union{String,Nothing})::Union{Real,Missing,Nothing}
     if tag === nothing
-        return missing
+        return nothing
     end
     # turn commas into dots to handle European-style decimal separators
     tag = replace(tag, "," => ".")
@@ -80,44 +70,42 @@ function parse_weight(tag::Union{String,Nothing})::Union{Real,Missing}
     if number !== nothing
         number = parse(Float64, number.match)
         unit = match(r"(t|tonne|tonnes|kg|lb|lbs)$", tag)
-        if unit === nothing
+        if unit === nothing && unit.match === nothing
             return round(number, 2)
-        else
-            if unit.match === nothing
-                return round(number, 2)
-            elseif unit.match in ["t", "tonne", "tonnes"]
-                return round(number, 2)
-            elseif unit.match === "kg"
-                return round(number * 0.001, 2)
-            elseif unit.match in ["lb", "lbs"]
-                return round(number * 0.0005, 2)
-            end
+        elseif unit.match in ["t", "tonne", "tonnes"]
+            return round(number, 2)
+        elseif unit.match == "kg"
+            return round(number * 0.001, 2)
+        elseif unit.match in ["lb", "lbs"]
+            return round(number * 0.0005, 2)
         end
-    else
-        return missing
     end
     return missing
 end
 
 
-function parse_lane_count(tag)
+"""
+Parse lane count as as number
+"""
+function parse_lane_count(tag::Union{String,Nothing})::Union{Int8,Missing,Nothing}
     if tag === nothing
         return nothing
     end
     number = match(r"[+-]?((\d+\.?\d*)|(\.\d+))", tag)
     if number !== nothing
-        lanes = parse(Int8, number.match)
+        lanes = Int8(floor(parse(Float64, number.match)))
         if lanes > 15
-            lanes = nothing
+            return missing
         end
-    else
-        lanes = nothing
+        return lanes
     end
-    return lanes
+    return missing
 end
 
-
-function parse_turn_lanes(tag)::Union{Vector{Vector{Union{Symbol,Missing}}},Nothing}
+"""
+Parse turn lane as symbolds
+"""
+function parse_turn_lanes(tag::Union{String,Nothing})::Union{Vector{Vector{Union{Symbol,Missing}}},Nothing}
     if tag === nothing
         return nothing
     end
@@ -129,8 +117,11 @@ function parse_turn_lanes(tag)::Union{Vector{Vector{Union{Symbol,Missing}}},Noth
     return lane_turns
 end
 
-
-function tokenize_conditional(tag)
+"""
+Tokenize conditional tags. The conditions get not parsed as this needs domain knowledge for the specific condition,
+instead they simply split in a defined ordered structure of tokens
+"""
+function tokenize_conditional(tag::Union{String,Nothing})::Vector{Dict}
     if tag === nothing || findfirst(isequal('@'), tag) === nothing
         return nothing
     end
