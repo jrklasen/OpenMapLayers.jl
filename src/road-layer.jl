@@ -3,10 +3,12 @@ struct RoadNode
     attributes::Union{RoadNodeAttribute,Nothing}
 end
 
+
 struct RoadWay
     child_ids::Vector{Int64}
     attributes::Union{RoadWayAttribute,Nothing}
 end
+
 
 struct RoadRelation
     child_ids::Vector{Int64}
@@ -14,6 +16,7 @@ struct RoadRelation
     child_roles::Vector{Symbol}
     attributes::Union{RoadRelationAttribute,Nothing}
 end
+
 
 struct RoadLayer
     nodes::Dict{Int64,RoadNode}
@@ -23,6 +26,9 @@ struct RoadLayer
     RoadLayer() = new(Dict(), Dict(), Dict())
 end
 
+""" This function is building a road layer from OSM data. It keeps the general structure of OSM data, but replaces tags
+    with a normed set of attributes.
+"""
 function road_layers(map::OpenStreetMap)::RoadLayer
     parends = find_parends(map)
 
@@ -39,21 +45,14 @@ function road_layers(map::OpenStreetMap)::RoadLayer
     # Ways
     for (k, v) in map.ways
         roadlayer = road_way_attributes(v.tags)
-        if haskey(parends.ways.relations, k) && roadlayer === nothing
-            roadlayer = nothing
-        end
-        if roadlayer !== nothing
+        if roadlayer !== nothing || haskey(parends.ways.relations, k)
             roads.ways[k] = RoadWay(v.refs, roadlayer)
         end
     end
     # Node
     for (k, v) in map.nodes
         roadlayer = road_node_attributes(v.tags)
-
-        if haskey(parends.nodes.relations, k) && haskey(parends.nodes.ways, k)
-            roadlayer = nothing
-        end
-        if roadlayer !== nothing
+        if roadlayer !== nothing || (haskey(parends.nodes.relations, k) || haskey(parends.nodes.ways, k))
             roads.nodes[k] = RoadNode(v.latlon, roadlayer)
         end
     end

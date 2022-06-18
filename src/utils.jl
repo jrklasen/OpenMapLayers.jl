@@ -32,6 +32,7 @@ function parse_maxspeed(tag::Union{String,Nothing})::Union{Int,Missing}
     end
 end
 
+
 """
 dimension
 """
@@ -65,6 +66,7 @@ function parse_dimension(tag::Union{String,Nothing})::Union{Real,Missing}
     end
 end
 
+
 """
 weight
 """
@@ -97,7 +99,8 @@ function parse_weight(tag::Union{String,Nothing})::Union{Real,Missing}
     return missing
 end
 
-function lanecount(tag)
+
+function parse_lane_count(tag)
     if tag === nothing
         return nothing
     end
@@ -105,13 +108,27 @@ function lanecount(tag)
     if number !== nothing
         lanes = parse(Int8, number.match)
         if lanes > 15
-            lanes = missing
+            lanes = nothing
         end
     else
         lanes = nothing
     end
     return lanes
 end
+
+
+function parse_turn_lanes(tag)::Union{Vector{Vector{Union{Symbol,Missing}}},Nothing}
+    if tag === nothing
+        return nothing
+    end
+    # split by '|' into single lanes
+    # split by ';' into multiple instructions per lane
+    split_lanes = split.(split(tag, '|'), ';')
+    # validate against lookup
+    lane_turns = [[get(TURN_LANES, i, missing) for i in j]  for j in split_lanes]
+    return lane_turns
+end
+
 
 function tokenize_conditional(tag)
     if tag === nothing || findfirst(isequal('@'), tag) === nothing
@@ -130,16 +147,4 @@ function tokenize_conditional(tag)
         "conndition" => string.(strip.(split(c, r"(AND| and )")))
     ) for (v, c) in orvalcon]
     return allconds
-end
-
-function turnlanes(tag)
-    if tag === nothing
-        return nothing
-    end
-    # split by '|' into single lanes
-    # split by ';' into multiple instructions per lane
-    split_lanes = split.(split(tag, '|'), ';')
-    # validate against lookup
-    lane_turns = [[get(WAY_TURN_LANES, i, missing) for i in j]  for j in split_lanes]
-    return lane_turns
 end

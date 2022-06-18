@@ -9,6 +9,7 @@ struct RoadNodeAttribute
     crossing::Bool
 end
 
+
 function road_node_attributes(tags)
     if tags === nothing
         return nothing
@@ -18,19 +19,12 @@ function road_node_attributes(tags)
     # barring, like gate and bollard
     barring = node_barring(tags)
     # check if the node is a crossing?
-    if !barring[:gate] && !barring[:bollard] && !barring[:sump_buster] && access[:access] == true
-        crossing = get(tags, "highway", "") == "crossing" || get(tags, "railway", "") == "crossing" ||
-                   get(tags, "footway", "") == "crossing" || get(tags, "cycleway", "") == "crossing" ||
-                   get(tags, "foot", "") == "crossing" || get(tags, "bicycle", "") == "crossing" ||
-                   get(tags, "pedestrian", "") == "crossing" || haskey(tags, "crossing")
-    else
-        crossing = false
-    end
+    crosswalk = node_crosswalk(tags,  access, barring)
     # mobilety mode access
-    foot_access = node_foot(tags, access, barring, crossing)
-    wheelchair_access = node_wheelchair(tags, access, barring, crossing)
-    bicycle_access = node_bicycle(tags, access, barring, crossing)
-    car_access = node_car(tags, access, barring, crossing)
+    foot_access = node_foot(tags, access, barring, crosswalk)
+    wheelchair_access = node_wheelchair(tags, access, barring, crosswalk)
+    bicycle_access = node_bicycle(tags, access, barring, crosswalk)
+    car_access = node_car(tags, access, barring, crosswalk)
     # access to privat roads
     if haskey(PRIVAT_ACCESS, get(tags, "access", ""))
         privat = PRIVAT_ACCESS[get(tags, "access", "")]
@@ -41,7 +35,7 @@ function road_node_attributes(tags)
     end
 
     if access[:access] !== nothing || foot_access[:foot] !== nothing || wheelchair_access[:wheelchair] !== nothing ||
-        bicycle_access[:bicycle] !== nothing || car_access[:car] !== nothing || privat || barring[:gate] || crossing
+        bicycle_access[:bicycle] !== nothing || car_access[:car] !== nothing || privat || barring[:gate] || crosswalk
         attr = RoadNodeAttribute(
             access[:access],
             foot_access[:foot],
@@ -50,7 +44,7 @@ function road_node_attributes(tags)
             car_access[:car],
             privat,
             barring[:gate],
-            crossing,
+            crosswalk,
         )
     else
         attr = nothing
@@ -58,6 +52,7 @@ function road_node_attributes(tags)
 
     return attr
 end
+
 
 function node_access(tags)::Dict{Symbol,Union{Bool,Nothing}}
     raw_access = get(tags, "access", "")
@@ -70,6 +65,7 @@ function node_access(tags)::Dict{Symbol,Union{Bool,Nothing}}
     end
     return Dict{Symbol,Union{Bool,Nothing}}(:access => access, :access_tag => access_tag)
 end
+
 
 function node_barring(tags)::Dict{Symbol,Bool}
     # check for gates, bollards, and sump_busters
@@ -93,12 +89,29 @@ function node_barring(tags)::Dict{Symbol,Bool}
 end
 
 
+function node_crosswalk(
+    tags::Dict{String,String},
+    access::Dict{Symbol,Union{Bool,Nothing}},
+    barring::Dict{Symbol,Bool},
+)::Bool
+    if !barring[:gate] && !barring[:bollard] && !barring[:sump_buster] && access[:access] == true
+        crosswalk = get(tags, "highway", "") == "crossing" || get(tags, "railway", "") == "crossing" ||
+                   get(tags, "footway", "") == "crossing" || get(tags, "cycleway", "") == "crossing" ||
+                   get(tags, "foot", "") == "crossing" || get(tags, "bicycle", "") == "crossing" ||
+                   get(tags, "pedestrian", "") == "crossing" || haskey(tags, "crossing")
+    else
+        crosswalk = false
+    end
+    return crosswalk
+end
+
+
 function node_foot(
     tags::Dict{String,String},
     access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
-    crossing::Bool
-)
+    crosswalk::Bool
+)::Dict{Symbol,Union{Bool,Nothing}}
     foot = get(FOOT_ACCESS, get(tags, "foot", ""), nothing)
     foot_tag = true
     # if tag is nothing, try to derive access info from additional information
@@ -111,19 +124,20 @@ function node_foot(
         elseif !barring[:gate] && barring[:sump_buster]
             foot = true
         end
-        if crossing
+        if crosswalk
             foot = true
         end
     end
     return Dict{Symbol,Union{Bool,Nothing}}(:foot => foot, :foot_tag => foot_tag)
 end
 
+
 function node_wheelchair(
     tags::Dict{String,String},
     access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
-    crossing::Bool
-)
+    crosswalk::Bool
+)::Dict{Symbol,Union{Bool,Nothing}}
     wheelchair = get(WHEELCHAIR_ACCESS, get(tags, "wheelchair", ""), nothing)
     # if wheelchair was not set and foot is
     if wheelchair === nothing && get(FOOT_ACCESS, get(tags, "foot", ""), false)
@@ -141,22 +155,23 @@ function node_wheelchair(
         elseif !barring[:gate] && barring[:sump_buster]
             wheelchair = true
         end
-        if crossing
+        if crosswalk
             wheelchair = true
         end
     end
     return Dict{Symbol,Union{Bool,Nothing}}(:wheelchair => wheelchair, :wheelchair_tag => wheelchair_tag)
 end
 
+
 function node_bicycle(
     tags::Dict{String,String},
     access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
-    crossing::Bool
-)
+    crosswalk::Bool
+)::Dict{Symbol,Union{Bool,Nothing}}
     bicycle = get(BICYCLE_ACCESS, get(tags, "bicycle", ""), nothing)
-    # do not shut off bicycle access if there is a highway crossing.
-    if bicycle === nothing && get(tags, "highway", "") == "crossing"
+    # do not shut off bicycle access if there is a highway crosswalk.
+    if bicycle === nothing && get(tags, "highway", "") == "crosswalk"
         bicycle = true
     end
     bicycle_tag = true
@@ -171,19 +186,20 @@ function node_bicycle(
         elseif !barring[:gate] && barring[:sump_buster]
             bicycle = true
         end
-        if crossing
+        if crosswalk
             bicycle = true
         end
     end
     return Dict{Symbol,Union{Bool,Nothing}}(:bicycle => bicycle, :bicycle_tag => bicycle_tag)
 end
 
+
 function node_car(
     tags::Dict{String,String},
     access::Dict{Symbol,Union{Bool,Nothing}},
     barring::Dict{Symbol,Bool},
-    crossing::Bool
-)
+    crosswalk::Bool
+)::Dict{Symbol,Union{Bool,Nothing}}
     motor_vehicle = get(MOTOR_VEHICLE_ACCESS, get(tags, "motor_vehicle", ""), nothing)
     car = get(MOTOR_VEHICLE_ACCESS, get(tags, "motorcar", ""), motor_vehicle)
     car_tag = true
@@ -198,7 +214,7 @@ function node_car(
         elseif !barring[:gate] && barring[:sump_buster]
             car = false
         end
-        if crossing
+        if crosswalk
             car = true
         end
     end

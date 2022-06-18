@@ -2,6 +2,7 @@ struct RoadRelationAttribute
     restriction_car::Symbol
 end
 
+
 function road_relation_attributes(tags)
     if get(tags, "type", "") != "restriction"
         return nothing
@@ -15,6 +16,7 @@ function road_relation_attributes(tags)
 
     return attr
 end
+
 
 function relation_car_restriction(tags)
     if get(tags, "type", "") != "restriction"
