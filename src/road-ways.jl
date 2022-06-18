@@ -20,6 +20,9 @@ struct RoadWayAttribute
     lanes_backward::Union{Int8,Nothing}
     turn_lanes_forward::Union{Array,Nothing}
     turn_lanes_backward::Union{Array,Nothing}
+    # shoulders
+    shoulder_left::Bool
+    shoulder_right::Bool
     # road attributes
     bridge::Bool
     tunnel::Bool
@@ -92,6 +95,8 @@ function road_way_attributes(tags::Union{Dict,Nothing})::Union{RoadWayAttribute,
         lanes[:lanes_backward],
         turn_lanes[:turn_lanes_forward],
         turn_lanes[:turn_lanes_backward],
+        shoulder[:shoulder_left],
+        shoulder[:shoulder_right],
         bridge,
         tunnel,
         private_access,
@@ -356,14 +361,15 @@ function way_bicycle_access(tags::Dict{String,String})::Dict{Symbol,Bool}
         end
     end
     # oneway access
-    if bicycle_backward &&
-            haskey(ONEWAY_ACCESS, get(tags, "oneway:bicycle", "")) &&
-            get(ONEWAY_ACCESS, get(tags, "oneway:bicycle", ""), false)
-        bicycle_forward = false
-    else
-        bicycle_forward = true
-    end
-    if !bicycle_backward && get(tags, "oneway:bicycle", "") != "-1" &&
+    if get(ONEWAY_ACCESS, get(tags, "oneway", ""), false)
+        if bicycle_backward
+            if get(ONEWAY_ACCESS, get(tags, "oneway:bicycle", ""), false)
+                bicycle_forward = false
+            else
+                bicycle_forward = true
+            end
+        end
+    else !bicycle_backward && get(tags, "oneway:bicycle", "") != "-1" &&
         (!haskey(tags, "oneway:bicycle") || !get(ONEWAY_ACCESS, get(tags, "oneway:bicycle", ""), true) ||
         get(tags, "oneway:bicycle", "") == "no")
         bicycle_backward = bicycle_forward
@@ -378,6 +384,7 @@ function way_bicycle_access(tags::Dict{String,String})::Dict{Symbol,Bool}
     if get(BICYCLE_SHARED, get(tags, "cycleway:both", ""), nothing) !== nothing ||
         get(BICYCLE_SEPARATED, get(tags, "cycleway:both", ""), nothing) !== nothing ||
         get(BICYCLE_DEDICATED, get(tags, "cycleway:both", ""), nothing) !== nothing ||
+
         ((get(BICYCLE_SHARED, get(tags, "cycleway:right", ""), nothing) !== nothing ||
             get(BICYCLE_SEPARATED, get(tags, "cycleway:right", ""), nothing) !== nothing ||
             get(BICYCLE_DEDICATED, get(tags, "cycleway:right", ""), nothing) !== nothing)) &&
@@ -597,9 +604,9 @@ function way_lanes(tags::Dict{String,String}, oneway::Symbol)::Dict{Symbol,Union
     end
     if lanes_forward === nothing && (oneway == :both || oneway == :worward || oneway == :reversible)
         lanes = parse_lane_count(get(tags, "lanes", nothing))
-        if lanes !== nothing  && lanes > 1 && oneway == :both
+        if lanes !== nothing && lanes !== missing && lanes > 1 && oneway == :both
             lanes_forward  = floor(lanes/2)
-        elseif lanes !== nothing  && lanes > 1 && (oneway == :forward || oneway == :reversible)
+        elseif lanes !== nothing && lanes !== missing  && lanes > 1 && (oneway == :forward || oneway == :reversible)
             lanes_forward  = lanes
         elseif oneway == :forward
             lanes_forward  = lanes
@@ -607,9 +614,9 @@ function way_lanes(tags::Dict{String,String}, oneway::Symbol)::Dict{Symbol,Union
     end
     if lanes_backward === nothing && (oneway == :both || oneway == :backward || oneway == :reversible)
         lanes = parse_lane_count(get(tags, "lanes", nothing))
-        if lanes !== nothing  && lanes > 1 && oneway == :both
+        if lanes !== nothing && lanes !== missing  && lanes > 1 && oneway == :both
             lanes_backward = floor(lanes/2)
-        elseif lanes !== nothing  && lanes > 1 && (oneway == :backward || oneway == :reversible)
+        elseif lanes !== nothing && lanes !== missing  && lanes > 1 && (oneway == :backward || oneway == :reversible)
             lanes_backward = lanes
         elseif oneway == :backward
             lanes_backward = lanes
@@ -648,7 +655,7 @@ function way_turn_lanes(tags::Dict{String,String}, oneway::Symbol)::Dict{Symbol,
 end
 
 
-function way_shoulder(tags::Dict{String,String})::Dict{String,Bool}
+function way_shoulder(tags::Dict{String,String})::Dict{Symbol,Bool}
     if haskey(SHOULDER, get(tags, "shoulder", ""))
         r_shoulder = SHOULDER[get(tags, "shoulder", "")]
     elseif haskey(SHOULDER, get(tags, "shoulder:both", ""))
@@ -669,5 +676,5 @@ function way_shoulder(tags::Dict{String,String})::Dict{String,Bool}
             l_shoulder = get(SHOULDER_LEFT, get(tags, "shoulder", ""), false)
         end
     end
-    return Dict{String,Bool}("shoulder_left" => l_shoulder, "shoulder_right" => r_shoulder)
+    return Dict{Symbol,Bool}(:shoulder_left => l_shoulder, :shoulder_right => r_shoulder)
 end
