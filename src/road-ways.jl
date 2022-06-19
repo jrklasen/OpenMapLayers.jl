@@ -144,6 +144,10 @@ function way_roadtype(tags::Dict{String,String})::Union{Symbol,Nothing}
         use = :emergency_access
     end
 
+    if get(tags, "bicycle_road", "") == "yes" || get(tags, "bicycle_road", "") == "designated"
+        use = :bicycle_road
+    end
+
     if haskey(tags, "highway")
         if get(tags, "highway", "") == "construction"
             use = :construction
@@ -155,6 +159,7 @@ function way_roadtype(tags::Dict{String,String})::Union{Symbol,Nothing}
             use = :service
         elseif get(tags, "highway", "") == "busway" || get(tags, "highway", "") == "bus_guideway"
             use = :busway
+        elseif get(tags, "highway", "") == "cycleway" && get(tags, "bicycle_road", "") == "yes"
         elseif get(tags, "highway", "") == "cycleway" && get(tags, "bicycle_road", "") == "yes"
             use = :bicycle_road
         elseif get(tags, "highway", "") == "cycleway"
